@@ -14,9 +14,10 @@
 """
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage  # noqa: F401
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-DEFAULT_SYSTEM_PROMPT = "你是一个乐于助人的助手，请用简洁的中文回答。"
+# DEFAULT_SYSTEM_PROMPT = "你是一个乐于助人的助手，请用简洁的中文回答。"
+DEFAULT_SYSTEM_PROMPT = "你是一个说话像海盗的助手。"
 
 
 def build_messages(system_prompt: str, user_input: str) -> list[BaseMessage]:
@@ -27,7 +28,9 @@ def build_messages(system_prompt: str, user_input: str) -> list[BaseMessage]:
       第 2 条：HumanMessage，内容是 user_input（用户说的话）
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return [SystemMessage(content=system_prompt), HumanMessage(content=user_input)]
+
 
 
 def ask(model: BaseChatModel, question: str) -> str:
@@ -39,7 +42,11 @@ def ask(model: BaseChatModel, question: str) -> str:
       3. 返回 AIMessage 的 .content 属性（字符串）
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    messages = build_messages(DEFAULT_SYSTEM_PROMPT, question)
+    ai_message = model.invoke(messages)
+    # print(f"====\n完整的AImessage回复：{ai_message}\n======")
+    return ai_message.content
 
 
 def build_conversation(history: list[tuple[str, str]]) -> list[BaseMessage]:
@@ -58,7 +65,19 @@ def build_conversation(history: list[tuple[str, str]]) -> list[BaseMessage]:
     思考：模型本身是“无状态”的，多轮对话就是把历史消息一起发给它。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    messages_list = []
+    for message in history:
+      if message[0] == "system":
+        messages_list.append(SystemMessage(content=message[1]))
+      elif message[0] == "human":
+        messages_list.append(HumanMessage(content=message[1]))
+      elif message[0] == "ai":
+        messages_list.append(AIMessage(content=message[1]))
+      else:
+        raise ValueError(f"错误的角色映射{message[0]}")
+    return messages_list
+
 
 
 def stream_answer(model: BaseChatModel, question: str) -> list[str]:
@@ -70,8 +89,12 @@ def stream_answer(model: BaseChatModel, question: str) -> list[str]:
       - 消息同样用 build_messages(DEFAULT_SYSTEM_PROMPT, question) 构造
     """
     # TODO: 在这里实现
-    raise NotImplementedError
-
+    # raise NotImplementedError
+    chunks = []
+    messages = build_messages(DEFAULT_SYSTEM_PROMPT, question)
+    for answer in model.stream(messages):
+      chunks.append(answer.content)
+    return chunks
 
 if __name__ == "__main__":
     # 配置好 .env 后运行：uv run python -m exercises.ch01_models_messages
