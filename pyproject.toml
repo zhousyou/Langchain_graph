@@ -1,0 +1,17 @@
+[project]
+name = "langchain-graph-tutorial"
+version = "0.1.0"
+description = "LangChain + LangGraph 实战教程：从零到一个可用的 Agent 应用"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=1.4.9",
+    "langchain-openai>=1.7.4",
+    "langgraph>=1.2.20",
+    "pytest>=9.2.0",
+    "python-dotenv>=1.2.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
