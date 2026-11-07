@@ -28,7 +28,12 @@ def make_translate_prompt() -> ChatPromptTemplate:
     所以模板的输入变量正好是 language 和 text 两个。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    messages = [
+      ("system", "你是一名专业翻译，请翻译成{language}"),
+      ("human", "{text}")
+    ]
+    return ChatPromptTemplate.from_messages(messages)
 
 
 def make_translate_chain(model: BaseChatModel) -> Runnable:
@@ -39,7 +44,9 @@ def make_translate_chain(model: BaseChatModel) -> Runnable:
     提示：StrOutputParser() 会把 AIMessage 转成它的 .content 字符串。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    chain = make_translate_prompt()| model | StrOutputParser()
+    return chain
 
 
 def make_chat_prompt() -> ChatPromptTemplate:
@@ -51,7 +58,13 @@ def make_chat_prompt() -> ChatPromptTemplate:
       3. human 消息："{question}"
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    messages = [
+      ("system", "你是一个友好的助手，用中文回答问题"),
+      MessagesPlaceholder("history"),
+      ("human", "{question}")
+    ]
+    return ChatPromptTemplate.from_messages(messages)
 
 
 # 练习 2.4：定义结构化输出的数据模型 MovieReview（继承 pydantic.BaseModel）
@@ -62,7 +75,9 @@ def make_chat_prompt() -> ChatPromptTemplate:
 #   给每个字段写上 description —— 它会被写进给模型的格式说明里，帮助模型理解字段含义。
 class MovieReview(BaseModel):
     # TODO: 在这里定义字段
-    pass
+    title: str = Field(description="电影名称")
+    rating: int = Field(description="评分", ge=1, le=10)
+    summary: str = Field(description="一句话影评")
 
 
 def make_review_chain(model: BaseChatModel) -> Runnable:
@@ -80,7 +95,20 @@ def make_review_chain(model: BaseChatModel) -> Runnable:
     讲义里有介绍；这里用解析器的方式，是为了让你看清“格式说明 + 解析”的原理。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    parser = PydanticOutputParser(pydantic_object=MovieReview)
+    messages = [
+      ("system", "从文本中提取电影的信息。\n{fomat_instruction}"),
+      ("human", "点评下电影{movie}。")
+    ]
+    prompt = ChatPromptTemplate.from_messages(messages).partial(fomat_instruction=parser.get_format_instructions())
+    # # 打印出prompt的模版输入
+    # for m in prompt.format_messages(movie="{movie}"):
+    #   m.pretty_print()
+    chain = prompt | model | parser
+    return chain
+
+    
 
 
 def make_word_count_chain() -> Runnable:
@@ -95,7 +123,11 @@ def make_word_count_chain() -> Runnable:
       chain.batch(["a b", "c"])       -> [{...}, {...}]   （所有 Runnable 都自带 batch）
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    to_lower = RunnableLambda(lambda x: x.strip().lower())
+    to_dict = RunnableLambda(lambda x: {"text": x, "word_count": x.count(' ')+1})
+    chain = to_lower | to_dict
+    return chain 
 
 
 if __name__ == "__main__":
@@ -103,5 +135,5 @@ if __name__ == "__main__":
     from tutorial_kit import get_llm
 
     llm = get_llm()
-    print(make_translate_chain(llm).invoke({"language": "英文", "text": "我爱学习 LangChain"}))
+    print(make_translate_chain(llm).invoke({"language": "日语", "text": "我爱学习 LangChain"}))
     print(make_review_chain(llm).invoke({"movie": "流浪地球"}))

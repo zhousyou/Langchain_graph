@@ -15,6 +15,7 @@
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+# from langchain_core.output_parsers import StrOutputParser
 
 # DEFAULT_SYSTEM_PROMPT = "你是一个乐于助人的助手，请用简洁的中文回答。"
 DEFAULT_SYSTEM_PROMPT = "你是一个说话像海盗的助手。"
@@ -45,6 +46,9 @@ def ask(model: BaseChatModel, question: str) -> str:
     # raise NotImplementedError
     messages = build_messages(DEFAULT_SYSTEM_PROMPT, question)
     ai_message = model.invoke(messages)
+    # parser = StrOutputParser()
+    # ans = parser.invoke(ai_message)
+    # print(f"====\nStrOutputParser的输出是{ans}\n=====")
     # print(f"====\n完整的AImessage回复：{ai_message}\n======")
     return ai_message.content
 
