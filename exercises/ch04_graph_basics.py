@@ -24,7 +24,9 @@ from langgraph.graph import END, START, StateGraph  # noqa: F401
 #   logs:  Annotated[list[str], operator.add]    —— 自定义 reducer：新列表追加到旧列表后面
 class CounterState(TypedDict):
     # TODO: 在这里定义字段
-    pass
+    # pass
+    count: int
+    logs: Annotated[list[str], operator.add]
 
 
 def increment(state: CounterState) -> dict:
@@ -34,13 +36,21 @@ def increment(state: CounterState) -> dict:
     注意：只返回要更新的字段；logs 返回的是“本次新增的条目”，reducer 会负责追加。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return {
+        "count": state["count"]+1,
+        "logs": ["increment"]
+    }
 
 
 def double(state: CounterState) -> dict:
     """练习 4.3：节点 double —— count 乘 2，并记录日志 "double"。"""
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return {
+        "count": state["count"]*2,
+        "logs": ["double"]
+    }
 
 
 def build_linear_graph():
@@ -56,7 +66,14 @@ def build_linear_graph():
           -> {"count": 4, "logs": ["increment", "double"]}
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    builder = StateGraph(CounterState)
+    builder.add_node("increment", increment)
+    builder.add_node("double", double)
+    builder.add_edge(START, "increment")
+    builder.add_edge("increment", "double")
+    builder.add_edge("double", END)
+    return builder.compile()
 
 
 # ---------------- 并行分支（fan-out / fan-in） ----------------
@@ -65,24 +82,34 @@ class ReportState(TypedDict):
     topic: str
     reports: Annotated[list[str], operator.add]  # 两个并行节点都会往这里写，所以必须用追加型 reducer
     summary: str
+    # reports: list[str]
 
 
 def fetch_news(state: ReportState) -> dict:
     """练习 4.5：返回 {"reports": [f"新闻:{topic}"]}"""
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return {
+        "reports": [f"新闻:{state['topic']}"]
+    }
 
 
 def fetch_weather(state: ReportState) -> dict:
     """练习 4.5：返回 {"reports": [f"天气:{topic}"]}"""
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return {
+        "reports": [f"天气:{state['topic']}"]
+    }
 
 
 def summarize(state: ReportState) -> dict:
     """练习 4.5：把 reports 排序后用 " | " 连接，写入 summary 字段。"""
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return {
+        "summary": " | ".join(sorted(state["reports"]))
+    }
 
 
 def build_fanout_graph():
@@ -99,7 +126,16 @@ def build_fanout_graph():
     思考：如果 reports 不用 operator.add 会发生什么？（试试看，LangGraph 会报错 InvalidUpdateError）
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    builder = StateGraph(ReportState)
+    builder.add_node("fetch_news", fetch_news)
+    builder.add_node("fetch_weather", fetch_weather)
+    builder.add_node("summarize", summarize)
+    builder.add_edge(START, "fetch_news")
+    builder.add_edge(START, "fetch_weather")
+    builder.add_edge(["fetch_news", "fetch_weather"], "summarize")
+    builder.add_edge("summarize", END)
+    return builder.compile()
 
 
 if __name__ == "__main__":
@@ -108,3 +144,4 @@ if __name__ == "__main__":
     print(graph.invoke({"count": 1, "logs": []}))
     print(graph.get_graph().draw_mermaid())  # 把输出粘贴到 https://mermaid.live 可以看到图
     print(build_fanout_graph().invoke({"topic": "北京", "reports": []}))
+    print(build_fanout_graph().get_graph().draw_mermaid())
