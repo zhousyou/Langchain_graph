@@ -27,6 +27,18 @@ FAKE_WEATHER = {"北京": "晴，25°C", "上海": "小雨，22°C", "广州": "
 #     模型就是靠这些信息决定“什么时候、用什么参数”调用工具的。
 # TODO: 在这里定义 multiply
 
+@tool
+def multiply(a: float, b: float) -> float:
+  """
+  乘法，返回a和b的乘积
+  Inputs:
+  a: 输入乘数
+  b: 输入乘数
+  Output:
+  a*b: 输出乘积
+  """
+  return a*b
+
 
 # 练习 3.2：定义工具 get_weather
 #   - 签名：get_weather(city: str) -> str
@@ -34,9 +46,20 @@ FAKE_WEATHER = {"北京": "晴，25°C", "上海": "小雨，22°C", "广州": "
 #   - 同样要写清楚 docstring
 # TODO: 在这里定义 get_weather
 
+@tool
+def get_weather(city: str) -> str:
+  """
+  获取city的天气情况
+  """
+  if city in FAKE_WEATHER:
+    return FAKE_WEATHER[city]
+  else:
+    # raise ValueError(f"未知城市：{city}")
+    return f"未知城市: {city}"
+
 
 # 练习 3.3：把上面两个工具放进列表
-TOOLS: list = []  # TODO: 改成 [multiply, get_weather]
+TOOLS: list = [multiply, get_weather]  # TODO: 改成 [multiply, get_weather]
 
 
 def execute_tool_calls(ai_message: AIMessage, tools: list[BaseTool]) -> list[ToolMessage]:
@@ -57,7 +80,19 @@ def execute_tool_calls(ai_message: AIMessage, tools: list[BaseTool]) -> list[Too
       3. 按顺序返回所有 ToolMessage
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    tool_messages = []
+    tool_dicts = {}
+    for tool in tools:
+      tool_dicts[tool.name] = tool
+    tool_calls = ai_message.tool_calls
+    for tool_call in tool_calls:
+      if tool_call["name"] in tool_dicts:
+        tool_messages.append(tool_dicts[tool_call["name"]].invoke(tool_call))
+      else:
+        tool_messages.append(ToolMessage(content=f"错误：没有名为{tool_call["name"]}的工具", tool_call_id = tool_call["id"]))
+    return tool_messages
+
 
 
 def run_one_round(model: BaseChatModel, tools: list[BaseTool], question: str) -> str:
@@ -74,7 +109,18 @@ def run_one_round(model: BaseChatModel, tools: list[BaseTool], question: str) ->
     思考：如果第 6 步模型又要求调用工具怎么办？——这就需要“循环”，第 6 章用 LangGraph 解决。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    model_with_tools = model.bind_tools(tools)
+    messages = [HumanMessage(content=question)]
+    ai_msg = model_with_tools.invoke(messages)
+    messages.append(ai_msg)
+    if not ai_msg.tool_calls:
+      return ai_msg.content
+    else:
+      tool_msg = execute_tool_calls(ai_msg, tools)
+      messages.extend(tool_msg)
+    final_msg = model_with_tools.invoke(messages)
+    return final_msg.content
 
 
 if __name__ == "__main__":
