@@ -12,6 +12,7 @@
 场景二：草稿反复修订，直到达到修订次数上限。
 """
 
+import stat
 from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph  # noqa: F401
@@ -33,7 +34,13 @@ def classify(state: TicketState) -> dict:
     （真实项目里这一步通常交给大模型 + 结构化输出来做，原理完全一样。）
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    if any(k in state["text"] for k in ["退款", "扣费", "发票"]):
+        return {"category": "billing"}
+    elif any(k in state["text"].lower() for k in ["报错", "崩溃", "bug"]):
+        return {"category": "tech"}
+    else:
+        return {"category": "general"}
 
 
 def route_by_category(state: TicketState) -> str:
@@ -46,7 +53,13 @@ def route_by_category(state: TicketState) -> str:
     注意：路由函数不修改状态，只返回“去哪”。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    if state["category"] == "billing":
+        return "billing_agent"
+    elif state["category"] == "tech":
+        return "tech_agent"
+    else:
+        return "general_agent"
 
 
 # 下面三个处理节点已经写好
@@ -75,7 +88,22 @@ def build_router_graph():
       )
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    builder = StateGraph(TicketState)
+    builder.add_node("classify", classify)
+    builder.add_node("billing_agent", billing_agent)
+    builder.add_node("tech_agent", tech_agent)
+    builder.add_node("general_agent", general_agent)
+
+    builder.add_edge(START, "classify")
+    builder.add_conditional_edges(
+        "classify",
+        route_by_category,
+        ["billing_agent", "tech_agent", "general_agent"]
+    )
+    builder.add_edge(["billing_agent", "tech_agent", "general_agent"], END)
+
+    return builder.compile()
 
 
 # ---------------- 循环 ----------------
@@ -92,7 +120,11 @@ def revise(state: DraftState) -> dict:
     例：{"draft": "初稿", "revisions": 0} -> {"draft": "初稿[第1次修订]", "revisions": 1}
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return {
+        "draft" : state["draft"]+f"[第{state['revisions']+1}次修订]",
+        "revisions" : state["revisions"]+1
+    }
 
 
 def should_continue(state: DraftState) -> str:
@@ -101,7 +133,8 @@ def should_continue(state: DraftState) -> str:
     revisions >= max_revisions 时返回 END（结束），否则返回 "revise"（继续循环）。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return END if state["revisions"] >= state["max_revisions"] else "revise"
 
 
 def build_loop_graph():
@@ -114,7 +147,18 @@ def build_loop_graph():
     超出会抛出 GraphRecursionError。测试里会验证这一点。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    builder = StateGraph(DraftState)
+    builder.add_node("revise", revise)
+
+    builder.add_edge(START, "revise")
+    builder.add_conditional_edges(
+        "revise",
+        should_continue,
+        ["revise", END]
+    )
+
+    return builder.compile()
 
 
 if __name__ == "__main__":
@@ -122,4 +166,4 @@ if __name__ == "__main__":
     router = build_router_graph()
     for t in ["我要退款", "App 一打开就崩溃", "你们周末上班吗"]:
         print(t, "->", router.invoke({"text": t}))
-    print(build_loop_graph().invoke({"draft": "初稿", "revisions": 0, "max_revisions": 3}))
+    print(build_loop_graph().invoke({"draft": "初稿", "revisions": 0, "max_revisions": 2}))
