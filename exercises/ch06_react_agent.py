@@ -42,7 +42,7 @@ def calculate(expression: str) -> str:
 
 
 TOOLS = [get_stock_price, calculate]
-SYSTEM_PROMPT = "你是一个股票助手。需要数据时调用工具，需要计算时调用 calculate 工具，不要心算。"
+SYSTEM_PROMPT = "你是一个股票助手。需要数据时调用工具，需要计算时调用 calculate 工具。"
 
 
 def make_call_model_node(model: BaseChatModel, tools: list[BaseTool], system_prompt: str):
@@ -58,7 +58,15 @@ def make_call_model_node(model: BaseChatModel, tools: list[BaseTool], system_pro
       3. return call_model
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    model_with_tools = model.bind_tools(tools)
+    def call_model(state: MessagesState) -> dict:
+      messages = [SystemMessage(content=system_prompt)] + state["messages"]
+      response = model_with_tools.invoke(messages)
+      return {
+        "messages": [response]
+      }
+    return call_model
 
 
 def should_continue(state: MessagesState) -> str:
@@ -69,7 +77,9 @@ def should_continue(state: MessagesState) -> str:
     （LangGraph 预置的 tools_condition 做的就是这件事，这里自己实现一遍加深理解。）
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    messages = state["messages"]
+    return "tools" if messages[-1].tool_calls else END
 
 
 def build_agent_graph(model: BaseChatModel, tools: list[BaseTool], system_prompt: str = SYSTEM_PROMPT):
@@ -85,7 +95,19 @@ def build_agent_graph(model: BaseChatModel, tools: list[BaseTool], system_prompt
     用法：graph.invoke({"messages": [("human", "NVDA 多少钱？")]})
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    builder = StateGraph(MessagesState)
+    builder.add_node("agent", make_call_model_node(model, tools, system_prompt))
+    builder.add_node("tools", ToolNode(tools))
+
+    builder.add_edge(START, "agent")
+    builder.add_conditional_edges(
+      "agent",
+      should_continue,
+      ["tools", END]
+    )
+    builder.add_edge("tools", "agent")
+    return builder.compile()
 
 
 def build_prebuilt_agent(model: BaseChatModel, tools: list[BaseTool], system_prompt: str = SYSTEM_PROMPT):
@@ -96,14 +118,24 @@ def build_prebuilt_agent(model: BaseChatModel, tools: list[BaseTool], system_pro
     思考：既然有一行的写法，为什么还要学手写？（答案见讲义）
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return  create_agent(model, tools, system_prompt=system_prompt)
 
 
 if __name__ == "__main__":
     # 配置好 .env 后运行：uv run python -m exercises.ch06_react_agent
     from tutorial_kit import get_llm
 
-    agent = build_agent_graph(get_llm(), TOOLS)
+    # agent = build_agent_graph(get_llm(), TOOLS)
     question = "我有 10 股 NVDA 和 2 股 AAPL，一共值多少美元？"
-    for step in agent.stream({"messages": [("human", question)]}, stream_mode="values"):
-        step["messages"][-1].pretty_print()
+    # for step in agent.stream({"messages": [("human", question)]}, stream_mode="values"):
+    #     step["messages"][-1].pretty_print()
+    # print(agent.get_graph().draw_mermaid())
+    agent_new = build_prebuilt_agent(get_llm(), TOOLS)
+    res = agent_new.invoke({"messages":[("human",question)]})
+    print(res)
+    print("====================")
+    print(res["messages"][-1].content)
+    print("====================")
+    for m in res["messages"]:
+      m.pretty_print()
