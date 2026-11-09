@@ -30,13 +30,30 @@ def build_memory_chatbot(model: BaseChatModel, checkpointer):
     有了 checkpointer，每次 invoke 只需要传“新的一条消息”，历史消息会从存档里自动恢复。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    def call_model(state):
+      response = model.invoke(state["messages"])
+      return {
+        "messages": [response]
+      }
+    builder = StateGraph(MessagesState)
+    builder.add_node("chatbot", call_model)
+
+    builder.add_edge(START, "chatbot")
+    builder.add_edge("chatbot", END)
+
+    return builder.compile(checkpointer=checkpointer)
 
 
 def make_config(thread_id: str) -> dict:
     """练习 7.2：构造运行配置，返回 {"configurable": {"thread_id": thread_id}}"""
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    return {
+      "configurable": {
+        "thread_id": thread_id
+      }
+    }
 
 
 def chat(app, thread_id: str, text: str) -> str:
@@ -47,7 +64,9 @@ def chat(app, thread_id: str, text: str) -> str:
       result["messages"] 是该会话的完整历史，最后一条就是最新回复
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    result = app.invoke({"messages": [HumanMessage(content=text)]}, make_config(thread_id))
+    return result["messages"][-1].content
 
 
 def get_history(app, thread_id: str) -> list[BaseMessage]:
@@ -57,7 +76,11 @@ def get_history(app, thread_id: str) -> list[BaseMessage]:
     会话不存在时返回空列表（.values 是空字典）。
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    snapshot = app.get_state(make_config(thread_id))
+    if not snapshot.values:
+      return []
+    return snapshot.values["messages"]
 
 
 # ---------------- 人在回路：转账审批 ----------------
@@ -80,7 +103,9 @@ def approval(state: TransferState) -> Command:
          否则：            return Command(goto=END,       update={"status": "rejected"})
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    decisioin = interrupt({"question": f"确认向{state["to"]}转账{state['amount']}元吗？(yes/no)"})
+    return Command(goto="excute", update={"status": "approved"}) if decisioin == "yes" else Command(goto=END, update={"status":"rejected"})
 
 
 def execute(state: TransferState) -> dict:
@@ -97,8 +122,15 @@ def build_transfer_graph(checkpointer):
       - interrupt 依赖 checkpointer 保存暂停时的现场，所以编译时必须传入 checkpointer
     """
     # TODO: 在这里实现
-    raise NotImplementedError
+    # raise NotImplementedError
+    builder = StateGraph(TransferState)
+    builder.add_node("approval", approval, destinations=["excute", END])
+    builder.add_node("excute", execute)
 
+    builder.add_edge(START, "approval")
+    builder.add_edge("excute", END)
+
+    return builder.compile(checkpointer=checkpointer)
 
 def resume(app, thread_id: str, decision: str) -> dict:
     """练习 7.7：用人类的决定恢复被暂停的图，返回最终状态。
@@ -106,8 +138,9 @@ def resume(app, thread_id: str, decision: str) -> dict:
     提示：app.invoke(Command(resume=decision), make_config(thread_id))
     """
     # TODO: 在这里实现
-    raise NotImplementedError
-
+    # raise NotImplementedError
+    result = app.invoke(Command(resume = decision), make_config(thread_id))
+    return result
 
 if __name__ == "__main__":
     # 配置好 .env 后运行：uv run python -m exercises.ch07_memory_hitl
@@ -115,10 +148,13 @@ if __name__ == "__main__":
 
     from tutorial_kit import get_llm
 
-    bot = build_memory_chatbot(get_llm(), InMemorySaver())
-    print(chat(bot, "u1", "我叫小明，喜欢打篮球"))
-    print(chat(bot, "u1", "我叫什么？喜欢什么？"))
-    print(chat(bot, "u2", "我叫什么？"))  # 另一个会话，应该不知道
+    # bot = build_memory_chatbot(get_llm(), InMemorySaver())
+    # print(chat(bot, "u1", "我叫小明，喜欢打篮球"))
+    # print(chat(bot, "u1", "我叫什么？喜欢什么？"))
+    # # print("=== u1 的历史 ===")
+    # # for m in get_history(bot, "u1"):
+    # #     m.pretty_print()
+    # print(chat(bot, "u2", "我叫什么？"))  # 另一个会话，应该不知道
 
     app = build_transfer_graph(InMemorySaver())
     r = app.invoke({"to": "张三", "amount": 100, "status": "pending"}, make_config("t1"))
